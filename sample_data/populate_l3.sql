@@ -280,3 +280,111 @@ SELECT
 FROM l3_spec_products.obt_specification_ctd
 WHERE spec_type_code = 'DP'
 ORDER BY sequence_number;
+
+-- =============================================================================
+-- obt_acceptance_criteria population
+-- Source: obt_specification_ctd (already loaded above — avoids re-joining L2.2)
+-- Adds computed width metrics: ac_width, nor_width, par_width,
+--   nor_tightness_pct (NOR_width / AC_width * 100),
+--   par_vs_ac_factor  (PAR_width / AC_width)
+-- =============================================================================
+
+TRUNCATE TABLE l3_spec_products.obt_acceptance_criteria;
+
+INSERT INTO l3_spec_products.obt_acceptance_criteria
+SELECT
+    spec_number,
+    spec_version,
+    spec_type_code,
+    spec_type_name,
+    stage_code,
+    ctd_section,
+    effective_start_date                                AS effective_date,
+    product_name,
+    inn_name,
+    material_name,
+    dosage_form_name,
+    strength,
+    nda_number,
+    region_code,
+    regulatory_body,
+    sequence_number,
+    test_name,
+    test_category_code,
+    test_category_name,
+    test_subcategory,
+    test_method_number,
+    compendia_test_ref,
+    result_uom_code,
+    ac_lower_limit,
+    ac_upper_limit,
+    ac_target,
+    ac_lower_operator,
+    ac_upper_operator,
+    ac_limit_text,
+    ac_limit_description,
+    ac_limit_basis,
+    ac_uom_code,
+    CASE
+        WHEN is_release_spec AND is_stability_spec THEN 'BOTH'
+        WHEN is_stability_spec                     THEN 'STABILITY'
+        ELSE                                            'RELEASE'
+    END                                                 AS ac_stage,
+    stability_time_point,
+    stability_condition,
+    ac_regulatory_basis,
+    is_compendial,
+    nor_lower_limit,
+    nor_upper_limit,
+    par_lower_limit,
+    par_upper_limit,
+    -- Computed: range widths
+    CASE WHEN ac_upper_limit  IS NOT NULL AND ac_lower_limit  IS NOT NULL
+         THEN ac_upper_limit  - ac_lower_limit  END     AS ac_width,
+    CASE WHEN nor_upper_limit IS NOT NULL AND nor_lower_limit IS NOT NULL
+         THEN nor_upper_limit - nor_lower_limit END     AS nor_width,
+    CASE WHEN par_upper_limit IS NOT NULL AND par_lower_limit IS NOT NULL
+         THEN par_upper_limit - par_lower_limit END     AS par_width,
+    -- NOR tightness: how narrow NOR is relative to AC (%)
+    CASE WHEN ac_upper_limit  IS NOT NULL AND ac_lower_limit  IS NOT NULL
+              AND nor_upper_limit IS NOT NULL AND nor_lower_limit IS NOT NULL
+              AND (ac_upper_limit - ac_lower_limit) > 0
+         THEN ROUND((nor_upper_limit - nor_lower_limit)
+                    / (ac_upper_limit - ac_lower_limit) * 100, 4)
+         END                                            AS nor_tightness_pct,
+    -- PAR vs AC factor: how many times wider PAR is vs AC
+    CASE WHEN ac_upper_limit  IS NOT NULL AND ac_lower_limit  IS NOT NULL
+              AND par_upper_limit IS NOT NULL AND par_lower_limit IS NOT NULL
+              AND (ac_upper_limit - ac_lower_limit) > 0
+         THEN ROUND((par_upper_limit - par_lower_limit)
+                    / (ac_upper_limit - ac_lower_limit), 4)
+         END                                            AS par_vs_ac_factor,
+    is_hierarchy_valid,
+    source_system_code,
+    current_timestamp()                                 AS load_timestamp
+FROM l3_spec_products.obt_specification_ctd;
+
+-- =============================================================================
+-- V5: obt_acceptance_criteria — limit comparison with width analytics
+-- =============================================================================
+SELECT
+    spec_number,
+    spec_version,
+    spec_type_code,
+    sequence_number                         AS seq,
+    test_name,
+    ac_limit_description                    AS acceptance_criteria,
+    ac_uom_code                             AS uom,
+    ac_regulatory_basis,
+    ac_width,
+    nor_lower_limit,
+    nor_upper_limit,
+    nor_width,
+    nor_tightness_pct,
+    par_lower_limit,
+    par_upper_limit,
+    par_width,
+    par_vs_ac_factor,
+    is_hierarchy_valid
+FROM l3_spec_products.obt_acceptance_criteria
+ORDER BY spec_type_code, spec_number, sequence_number;
