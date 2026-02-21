@@ -4,9 +4,10 @@
 -- Layer  : L2.2 — Unified Data Model (Business Conform Layer)
 -- Domain : Pharmaceutical Quality — Specifications
 -- Grain  : One row per specification version (SCD Type 2)
--- Purpose: Specification header / metadata dimension. Captures the identity,
---          regulatory context, lifecycle status, and product/material linkage
---          of each pharmaceutical specification document.
+-- Ref    : specification_data_model_30-jan.html → SPECIFICATION_HEADER
+-- Changes: v2 — added site_key FK (→ dim_site), market_key FK (→ dim_market),
+--               renamed effective_date → effective_start_date,
+--               expiry_date → effective_end_date (aligned with ref ERD).
 -- CTD    : Supports 3.2.S.4.1 (Drug Substance) and 3.2.P.5.1 (Drug Product)
 -- Author : Pharma Quality Data Team
 -- =============================================================================
@@ -44,10 +45,13 @@ CREATE TABLE IF NOT EXISTS l2_2_spec_unified.dim_specification
 
     -- -------------------------------------------------------------------------
     -- Foreign Keys (Dimensions)
+    -- Ref ERD: PRODUCT governs, SITE applicable_at, MARKET applicable_for
     -- -------------------------------------------------------------------------
-    product_key                 BIGINT                      COMMENT 'FK to dim_product (NULL for drug substance/raw material specs)',
-    material_key                BIGINT                      COMMENT 'FK to dim_material',
-    regulatory_context_key      BIGINT                      COMMENT 'FK to dim_regulatory_context',
+    product_key                 BIGINT                      COMMENT 'FK → dim_product',
+    material_key                BIGINT                      COMMENT 'FK → dim_material',
+    site_key                    BIGINT                      COMMENT 'FK → dim_site (applicable_at — ref ERD: SITE ||--o{ SPECIFICATION_HEADER)',
+    market_key                  BIGINT                      COMMENT 'FK → dim_market (applicable_for — ref ERD: MARKET ||--o{ SPECIFICATION_HEADER)',
+    regulatory_context_key      BIGINT                      COMMENT 'FK → dim_regulatory_context (filing context: NDA, MAA, submission type)',
 
     -- -------------------------------------------------------------------------
     -- Regulatory / CTD Attributes
@@ -74,23 +78,17 @@ CREATE TABLE IF NOT EXISTS l2_2_spec_unified.dim_specification
     status_name                 STRING                      COMMENT 'Status display name',
 
     -- -------------------------------------------------------------------------
-    -- Dates
+    -- Effective Date Range (aligned with SPECIFICATION_HEADER in ref ERD)
     -- -------------------------------------------------------------------------
-    effective_date              DATE                        COMMENT 'Date specification became effective / active',
-    expiry_date                 DATE                        COMMENT 'Scheduled expiry date (e.g., for periodic review)',
-    approval_date               DATE                        COMMENT 'Date of formal quality/regulatory approval',
+    effective_start_date        DATE                        COMMENT 'Date specification became effective (ref ERD: effective_start_date)',
+    effective_end_date          DATE                        COMMENT 'Date specification expires or is superseded — NULL = open-ended (ref ERD: effective_end_date)',
+    approval_date               DATE                        COMMENT 'Date of formal quality / regulatory approval',
 
     -- -------------------------------------------------------------------------
     -- Approval / Authorization
     -- -------------------------------------------------------------------------
     approver_name               STRING                      COMMENT 'Name of approving authority',
     approver_title              STRING                      COMMENT 'Title/role of approving authority',
-
-    -- -------------------------------------------------------------------------
-    -- Site
-    -- -------------------------------------------------------------------------
-    site_code                   STRING                      COMMENT 'Manufacturing or testing site code',
-    site_name                   STRING                      COMMENT 'Manufacturing or testing site name',
 
     -- -------------------------------------------------------------------------
     -- Compendia Reference
@@ -119,7 +117,7 @@ CREATE TABLE IF NOT EXISTS l2_2_spec_unified.dim_specification
 )
 USING DELTA
 PARTITIONED BY (spec_type_code)
-COMMENT 'L2.2 Specification header dimension. One row per specification version (SCD Type 2). Captures identity, lifecycle status, regulatory context, and product/material linkage. Supports CTD 3.2.S.4.1 and 3.2.P.5.1.'
+COMMENT 'L2.2 Specification header dimension v2. SCD Type 2. v2 adds site_key FK (→ dim_site), market_key FK (→ dim_market), effective_start_date/effective_end_date. Aligned with SPECIFICATION_HEADER from specification_data_model_30-jan. Supports CTD 3.2.S.4.1 and 3.2.P.5.1.'
 TBLPROPERTIES (
     'delta.autoOptimize.optimizeWrite'  = 'true',
     'delta.autoOptimize.autoCompact'    = 'true',
@@ -128,7 +126,9 @@ TBLPROPERTIES (
     'quality.layer'                     = 'L2.2',
     'quality.scd_type'                  = '2',
     'quality.grain'                     = 'specification_version',
-    'quality.ctd_sections'              = '3.2.S.4.1,3.2.P.5.1'
+    'quality.model_version'             = '2',
+    'quality.ctd_sections'              = '3.2.S.4.1,3.2.P.5.1',
+    'quality.source_model'              = 'SPECIFICATION_HEADER (specification_data_model_30-jan.html)'
 );
 
 -- Optimize read performance on common filter patterns

@@ -11,8 +11,8 @@
 --                Acceptance Criteria (AC)
 --                Normal Operating Range (NOR)
 --                Proven Acceptable Range (PAR)
---                Alert Limits
---                Action Limits
+--                Alert Limits (with SPC fields)
+--                Action Limits (with SPC fields)
 --          This table serves as the primary analytical layer for:
 --            - Specification review and approval workflows
 --            - Quality dashboard and trending
@@ -21,6 +21,13 @@
 --          Refresh strategy: Full overwrite on each ETL cycle (not incremental)
 --          to ensure pivot accuracy.
 -- CTD    : Used as source for CTD 3.2.S.4.1 / 3.2.P.5.1 tabular output
+-- Changes: v2 — added site (GMP status, regulatory region) and market (country,
+--               MA status) from dim_site / dim_market FKs on dim_specification;
+--               added analyte_code, criticality from dim_specification_item;
+--               added SPC fields (calculation_method, sample_size,
+--               last_calculated_date) for Alert and Action limits;
+--               renamed effective_date → effective_start_date, added
+--               effective_end_date to align with dim_specification v2.
 -- Author : Pharma Quality Data Team
 -- =============================================================================
 
@@ -40,11 +47,22 @@ CREATE TABLE IF NOT EXISTS l2_2_spec_unified.dspec_specification
     stage_name                  STRING                      COMMENT 'Stage display name',
     status_code                 STRING          NOT NULL    COMMENT 'Status: DRA|APP|SUP|OBS|ARCH',
     status_name                 STRING                      COMMENT 'Status display name',
-    effective_date              DATE                        COMMENT 'Specification effective date',
+    effective_start_date        DATE                        COMMENT 'Specification effective date (ref ERD: effective_start_date)',
+    effective_end_date          DATE                        COMMENT 'Specification expiry date — NULL = open-ended (ref ERD: effective_end_date)',
     approval_date               DATE                        COMMENT 'Specification approval date',
     approver_name               STRING                      COMMENT 'Approving authority name',
-    site_code                   STRING                      COMMENT 'Manufacturing / testing site code',
-    site_name                   STRING                      COMMENT 'Manufacturing / testing site name',
+
+    -- Site (from dim_site via dim_specification.site_key)
+    site_code                   STRING                      COMMENT 'Manufacturing / testing site code (from dim_site)',
+    site_name                   STRING                      COMMENT 'Manufacturing / testing site name (from dim_site)',
+    site_regulatory_region      STRING                      COMMENT 'GxP regulatory region at site: FDA|EMA|PMDA|ANVISA (from dim_site)',
+    gmp_status                  STRING                      COMMENT 'Site GMP status: APPROVED|WARNING_LETTER|IMPORT_ALERT (from dim_site)',
+
+    -- Market (from dim_market via dim_specification.market_key)
+    market_country_code         STRING                      COMMENT 'ISO 3166-1 country code of target market (from dim_market)',
+    market_country_name         STRING                      COMMENT 'Country name of target market (from dim_market)',
+    market_status               STRING                      COMMENT 'Marketing authorisation status: APPROVED|PENDING|FILED|WITHDRAWN (from dim_market)',
+
     compendia_reference         STRING                      COMMENT 'Pharmacopoeia basis: USP|EP|JP|BP',
     supersedes_spec_id          STRING                      COMMENT 'Natural key of prior specification version',
 
@@ -83,6 +101,8 @@ CREATE TABLE IF NOT EXISTS l2_2_spec_unified.dspec_specification
     test_category_code          STRING                      COMMENT 'Category: PHY|CHE|IMP|MIC|BIO|STER',
     test_category_name          STRING                      COMMENT 'Category display name',
     test_subcategory            STRING                      COMMENT 'Subcategory (e.g., Related Substances)',
+    analyte_code                STRING                      COMMENT 'Specific analyte / substance identifier in multi-analyte tests (ref ERD: analyte_code)',
+    criticality                 STRING                      COMMENT 'ICH Q8 quality attribute criticality: CQA|CCQA|NCQA|KQA|REPORT (ref ERD: criticality)',
     test_method_number          STRING                      COMMENT 'Analytical method number',
     test_method_name            STRING                      COMMENT 'Analytical method name',
     test_method_version         STRING                      COMMENT 'Analytical method version',
@@ -143,20 +163,28 @@ CREATE TABLE IF NOT EXISTS l2_2_spec_unified.dspec_specification
     par_uom_code                STRING                      COMMENT 'PAR unit code',
 
     -- =========================================================================
-    -- SECTION H: ALERT LIMITS (Internal — not in regulatory filing)
+    -- SECTION H: ALERT LIMITS (Internal SPC — not in regulatory filing)
     -- Sourced from fact_specification_limit WHERE limit_type_code = 'ALERT'
+    -- SPC fields populated from CONTROL_LIMITS (ref ERD)
     -- =========================================================================
     alert_lower_limit           DECIMAL(18, 6)              COMMENT 'Alert limit lower bound',
     alert_upper_limit           DECIMAL(18, 6)              COMMENT 'Alert limit upper bound',
     alert_limit_description     STRING                      COMMENT 'Alert limit full formatted expression',
+    alert_calculation_method    STRING                      COMMENT 'SPC method used to derive alert limits: 3_SIGMA|CPK|EWMA|CUSUM|MANUAL',
+    alert_sample_size           INT                         COMMENT 'Number of historical data points used for alert limit calculation',
+    alert_last_calculated_date  DATE                        COMMENT 'Date alert limits were last recalculated from historical data',
 
     -- =========================================================================
-    -- SECTION I: ACTION LIMITS (Internal — not in regulatory filing)
+    -- SECTION I: ACTION LIMITS (Internal SPC — not in regulatory filing)
     -- Sourced from fact_specification_limit WHERE limit_type_code = 'ACTION'
+    -- SPC fields populated from CONTROL_LIMITS (ref ERD)
     -- =========================================================================
     action_lower_limit          DECIMAL(18, 6)              COMMENT 'Action limit lower bound',
     action_upper_limit          DECIMAL(18, 6)              COMMENT 'Action limit upper bound',
     action_limit_description    STRING                      COMMENT 'Action limit full formatted expression',
+    action_calculation_method   STRING                      COMMENT 'SPC method used to derive action limits: 3_SIGMA|CPK|EWMA|CUSUM|MANUAL',
+    action_sample_size          INT                         COMMENT 'Number of historical data points used for action limit calculation',
+    action_last_calculated_date DATE                        COMMENT 'Date action limits were last recalculated from historical data',
 
     -- =========================================================================
     -- SECTION J: LIMIT HIERARCHY VALIDATION FLAGS (computed)
@@ -193,6 +221,7 @@ TBLPROPERTIES (
 -- =============================================================================
 -- This query populates dspec_specification from the star schema.
 -- Run as OVERWRITE to ensure consistency.
+-- v2: added dim_site, dim_market joins; analyte_code, criticality; SPC fields.
 --
 -- INSERT OVERWRITE l2_2_spec_unified.dspec_specification
 -- SELECT
@@ -208,11 +237,17 @@ TBLPROPERTIES (
 --     s.stage_name,
 --     s.status_code,
 --     s.status_name,
---     s.effective_date,
+--     s.effective_start_date,
+--     s.effective_end_date,
 --     s.approval_date,
 --     s.approver_name,
---     s.site_code,
---     s.site_name,
+--     st.site_code,
+--     st.site_name,
+--     st.regulatory_region                                        AS site_regulatory_region,
+--     st.gmp_status,
+--     mk.country_code                                             AS market_country_code,
+--     mk.country_name                                             AS market_country_name,
+--     mk.market_status,
 --     s.compendia_reference,
 --     s.supersedes_spec_id,
 --
@@ -245,6 +280,8 @@ TBLPROPERTIES (
 --     i.test_category_code,
 --     i.test_category_name,
 --     i.test_subcategory,
+--     i.analyte_code,
+--     i.criticality,
 --     tm.test_method_number,
 --     tm.test_method_name,
 --     tm.test_method_version,
@@ -259,48 +296,54 @@ TBLPROPERTIES (
 --     i.is_compendial,
 --
 --     -- Section E: Acceptance Criteria (pivoted)
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.lower_limit_value   END) AS ac_lower_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.upper_limit_value   END) AS ac_upper_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.target_value        END) AS ac_target,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.lower_limit_value    END) AS ac_lower_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.upper_limit_value    END) AS ac_upper_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.target_value         END) AS ac_target,
 --     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.lower_limit_operator END) AS ac_lower_operator,
 --     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.upper_limit_operator END) AS ac_upper_operator,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.limit_text          END) AS ac_limit_text,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.limit_description   END) AS ac_limit_description,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.limit_basis         END) AS ac_limit_basis,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.stage_code          END) AS ac_stage,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.limit_text           END) AS ac_limit_text,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.limit_description    END) AS ac_limit_description,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.limit_basis          END) AS ac_limit_basis,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.stage_code           END) AS ac_stage,
 --     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.stability_time_point END) AS ac_stability_time_point,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.stability_condition END) AS ac_stability_condition,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.regulatory_basis    END) AS ac_regulatory_basis,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.is_in_filing        END) AS ac_is_in_filing,
---     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN fu.uom_code           END) AS ac_uom_code,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.stability_condition  END) AS ac_stability_condition,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.regulatory_basis     END) AS ac_regulatory_basis,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN f.is_in_filing         END) AS ac_is_in_filing,
+--     MAX(CASE WHEN lt.limit_type_code = 'AC' THEN fu.uom_code            END) AS ac_uom_code,
 --
 --     -- Section F: NOR (pivoted)
---     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.lower_limit_value  END) AS nor_lower_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.upper_limit_value  END) AS nor_upper_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.target_value       END) AS nor_target,
+--     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.lower_limit_value    END) AS nor_lower_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.upper_limit_value    END) AS nor_upper_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.target_value         END) AS nor_target,
 --     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.lower_limit_operator END) AS nor_lower_operator,
 --     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.upper_limit_operator END) AS nor_upper_operator,
---     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.limit_description  END) AS nor_limit_description,
---     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN fu.uom_code          END) AS nor_uom_code,
+--     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN f.limit_description    END) AS nor_limit_description,
+--     MAX(CASE WHEN lt.limit_type_code = 'NOR' THEN fu.uom_code            END) AS nor_uom_code,
 --
 --     -- Section G: PAR (pivoted)
---     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.lower_limit_value  END) AS par_lower_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.upper_limit_value  END) AS par_upper_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.target_value       END) AS par_target,
+--     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.lower_limit_value    END) AS par_lower_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.upper_limit_value    END) AS par_upper_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.target_value         END) AS par_target,
 --     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.lower_limit_operator END) AS par_lower_operator,
 --     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.upper_limit_operator END) AS par_upper_operator,
---     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.limit_description  END) AS par_limit_description,
---     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN fu.uom_code          END) AS par_uom_code,
+--     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN f.limit_description    END) AS par_limit_description,
+--     MAX(CASE WHEN lt.limit_type_code = 'PAR' THEN fu.uom_code            END) AS par_uom_code,
 --
---     -- Section H: Alert (pivoted)
---     MAX(CASE WHEN lt.limit_type_code = 'ALERT' THEN f.lower_limit_value END) AS alert_lower_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'ALERT' THEN f.upper_limit_value END) AS alert_upper_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'ALERT' THEN f.limit_description END) AS alert_limit_description,
+--     -- Section H: Alert (pivoted + SPC fields)
+--     MAX(CASE WHEN lt.limit_type_code = 'ALERT' THEN f.lower_limit_value      END) AS alert_lower_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'ALERT' THEN f.upper_limit_value      END) AS alert_upper_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'ALERT' THEN f.limit_description      END) AS alert_limit_description,
+--     MAX(CASE WHEN lt.limit_type_code = 'ALERT' THEN f.calculation_method     END) AS alert_calculation_method,
+--     MAX(CASE WHEN lt.limit_type_code = 'ALERT' THEN f.sample_size            END) AS alert_sample_size,
+--     MAX(CASE WHEN lt.limit_type_code = 'ALERT' THEN f.last_calculated_date   END) AS alert_last_calculated_date,
 --
---     -- Section I: Action (pivoted)
---     MAX(CASE WHEN lt.limit_type_code = 'ACTION' THEN f.lower_limit_value END) AS action_lower_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'ACTION' THEN f.upper_limit_value END) AS action_upper_limit,
---     MAX(CASE WHEN lt.limit_type_code = 'ACTION' THEN f.limit_description END) AS action_limit_description,
+--     -- Section I: Action (pivoted + SPC fields)
+--     MAX(CASE WHEN lt.limit_type_code = 'ACTION' THEN f.lower_limit_value     END) AS action_lower_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'ACTION' THEN f.upper_limit_value     END) AS action_upper_limit,
+--     MAX(CASE WHEN lt.limit_type_code = 'ACTION' THEN f.limit_description     END) AS action_limit_description,
+--     MAX(CASE WHEN lt.limit_type_code = 'ACTION' THEN f.calculation_method    END) AS action_calculation_method,
+--     MAX(CASE WHEN lt.limit_type_code = 'ACTION' THEN f.sample_size           END) AS action_sample_size,
+--     MAX(CASE WHEN lt.limit_type_code = 'ACTION' THEN f.last_calculated_date  END) AS action_last_calculated_date,
 --
 --     -- Section J: Hierarchy Validation
 --     CASE WHEN
@@ -341,6 +384,10 @@ TBLPROPERTIES (
 --     ON s.material_key = m.material_key AND m.is_current = TRUE
 -- LEFT JOIN l2_2_spec_unified.dim_regulatory_context rc
 --     ON s.regulatory_context_key = rc.regulatory_context_key
+-- LEFT JOIN l2_2_spec_unified.dim_site st
+--     ON s.site_key = st.site_key AND st.is_current = TRUE
+-- LEFT JOIN l2_2_spec_unified.dim_market mk
+--     ON s.market_key = mk.market_key AND mk.is_current = TRUE
 -- LEFT JOIN l2_2_spec_unified.dim_test_method tm
 --     ON i.test_method_key = tm.test_method_key AND tm.is_current = TRUE
 -- LEFT JOIN l2_2_spec_unified.dim_uom u
@@ -352,14 +399,17 @@ TBLPROPERTIES (
 --     s.spec_key, s.spec_number, s.spec_version, s.spec_title,
 --     s.spec_type_code, s.spec_type_name, s.ctd_section,
 --     s.stage_code, s.stage_name, s.status_code, s.status_name,
---     s.effective_date, s.approval_date, s.approver_name,
---     s.site_code, s.site_name, s.compendia_reference, s.supersedes_spec_id,
+--     s.effective_start_date, s.effective_end_date, s.approval_date, s.approver_name,
+--     st.site_code, st.site_name, st.regulatory_region, st.gmp_status,
+--     mk.country_code, mk.country_name, mk.market_status,
+--     s.compendia_reference, s.supersedes_spec_id,
 --     p.product_name, p.inn_name, p.brand_name, p.dosage_form_code,
 --     p.dosage_form_name, p.route_of_administration, p.strength, p.nda_number,
 --     m.material_name, m.material_type_code, m.cas_number, m.molecular_weight,
 --     rc.regulatory_context_code, rc.region_code, rc.regulatory_body, rc.submission_type,
 --     i.spec_item_key, i.sequence_number, i.test_code, i.test_name, i.test_description,
 --     i.test_category_code, i.test_category_name, i.test_subcategory,
+--     i.analyte_code, i.criticality,
 --     tm.test_method_number, tm.test_method_name, tm.test_method_version,
 --     tm.analytical_technique, i.compendia_test_ref,
 --     u.uom_code, u.uom_name, i.reporting_type, i.result_precision,

@@ -6,6 +6,11 @@
 -- Grain  : One row per specification item per stability time point
 --          (release specs = one row per test;
 --           stability specs = one row per test per time point per condition)
+-- Changes: v2 — added site (site_code, site_name, site_regulatory_region) and
+--               market (market_country_code, market_country_name, market_status)
+--               from dim_site / dim_market; added analyte_code and criticality
+--               from dim_specification_item; renamed effective_date →
+--               effective_start_date (aligned with dim_specification v2).
 -- Purpose: PRIMARY FINAL DATA PRODUCT for regulatory submission (CTD filing).
 --          One Big Table (OBT) fully denormalized, flattened, and CTD-aligned.
 --          Integrates ALL specification, item, limit, product, material, method,
@@ -48,11 +53,21 @@ CREATE TABLE IF NOT EXISTS l3_spec_products.obt_specification_ctd
     stage_code                  STRING          NOT NULL    COMMENT 'DEV|CLI|COM',
     stage_name                  STRING                      COMMENT 'Development|Clinical|Commercial',
     status_code                 STRING          NOT NULL    COMMENT 'APP|DRA|SUP|OBS (only APP in this OBT)',
-    effective_date              DATE                        COMMENT 'Specification effective date',
+    effective_start_date        DATE                        COMMENT 'Specification effective date (ref ERD: effective_start_date)',
+    effective_end_date          DATE                        COMMENT 'Specification expiry date — NULL = open-ended',
     approval_date               DATE                        COMMENT 'Specification approval date',
     approver_name               STRING                      COMMENT 'Approving authority name',
-    site_code                   STRING                      COMMENT 'Manufacturing / testing site code',
-    site_name                   STRING                      COMMENT 'Manufacturing / testing site name',
+
+    -- Site of manufacture / testing (from dim_site)
+    site_code                   STRING                      COMMENT 'Manufacturing / testing site code (from dim_site)',
+    site_name                   STRING                      COMMENT 'Manufacturing / testing site name (from dim_site)',
+    site_regulatory_region      STRING                      COMMENT 'GxP regulatory region: FDA|EMA|PMDA|ANVISA (from dim_site)',
+
+    -- Target market / country (from dim_market)
+    market_country_code         STRING                      COMMENT 'ISO 3166-1 country code of target market (from dim_market)',
+    market_country_name         STRING                      COMMENT 'Country name of target market (from dim_market)',
+    market_status               STRING                      COMMENT 'Marketing authorisation status: APPROVED|PENDING|FILED|WITHDRAWN',
+
     compendia_reference         STRING                      COMMENT 'Pharmacopoeia basis: USP|EP|JP|BP',
 
     -- =========================================================================
@@ -98,6 +113,8 @@ CREATE TABLE IF NOT EXISTS l3_spec_products.obt_specification_ctd
     test_category_code          STRING                      COMMENT 'PHY|CHE|IMP|MIC|BIO|STER|PACK',
     test_category_name          STRING                      COMMENT 'Test category display name',
     test_subcategory            STRING                      COMMENT 'e.g., Related Substances, Residual Solvents',
+    analyte_code                STRING                      COMMENT 'Specific analyte / substance identifier in multi-analyte tests',
+    criticality                 STRING                      COMMENT 'ICH Q8 quality attribute criticality: CQA|CCQA|NCQA|KQA|REPORT',
     is_required                 BOOLEAN                     COMMENT 'TRUE = mandatory test',
     is_compendial               BOOLEAN                     COMMENT 'TRUE = test from official pharmacopoeia',
     reporting_type              STRING                      COMMENT 'NUMERIC|PASS_FAIL|TEXT|REPORT_ONLY',
@@ -184,6 +201,8 @@ TBLPROPERTIES (
 -- =============================================================================
 -- POPULATION QUERY — from L2.2 dspec_specification
 -- =============================================================================
+-- v2: added site, market, analyte_code, criticality, effective_start/end_date.
+--
 -- INSERT OVERWRITE l3_spec_products.obt_specification_ctd
 -- SELECT
 --     spec_key,
@@ -196,11 +215,16 @@ TBLPROPERTIES (
 --     stage_code,
 --     stage_name,
 --     status_code,
---     effective_date,
+--     effective_start_date,
+--     effective_end_date,
 --     approval_date,
 --     approver_name,
 --     site_code,
 --     site_name,
+--     site_regulatory_region,
+--     market_country_code,
+--     market_country_name,
+--     market_status,
 --     compendia_reference,
 --     product_name,
 --     inn_name,
@@ -230,6 +254,8 @@ TBLPROPERTIES (
 --     test_category_code,
 --     test_category_name,
 --     test_subcategory,
+--     analyte_code,
+--     criticality,
 --     is_required,
 --     is_compendial,
 --     reporting_type,
@@ -257,13 +283,13 @@ TBLPROPERTIES (
 --     ac_stability_time_point   AS stability_time_point,
 --     ac_stability_condition    AS stability_condition,
 --     CASE ac_stability_condition
---         WHEN '25C60RH'   THEN '25°C/60%RH (Long-term)'
---         WHEN '30C65RH'   THEN '30°C/65%RH (Intermediate)'
---         WHEN '40C75RH'   THEN '40°C/75%RH (Accelerated)'
---         WHEN 'REFRIG'    THEN '2-8°C (Refrigerated)'
---         WHEN 'FREEZE'    THEN '-20°C (Frozen)'
---         WHEN 'DEEPFREEZE'THEN '-80°C (Deep Freeze)'
---         WHEN 'PHOTO'     THEN 'Photostability'
+--         WHEN '25C60RH'    THEN '25°C/60%RH (Long-term)'
+--         WHEN '30C65RH'    THEN '30°C/65%RH (Intermediate)'
+--         WHEN '40C75RH'    THEN '40°C/75%RH (Accelerated)'
+--         WHEN 'REFRIG'     THEN '2-8°C (Refrigerated)'
+--         WHEN 'FREEZE'     THEN '-20°C (Frozen)'
+--         WHEN 'DEEPFREEZE' THEN '-80°C (Deep Freeze)'
+--         WHEN 'PHOTO'      THEN 'Photostability'
 --         ELSE ac_stability_condition
 --     END                        AS stability_condition_label,
 --     (ac_stage = 'RELEASE' OR ac_stage = 'BOTH')   AS is_release_spec,
@@ -279,7 +305,7 @@ TBLPROPERTIES (
 --     spec_item_key              AS source_spec_item_key,
 --     'LIMS'                     AS source_system_code,    -- replace with actual
 --     current_timestamp()        AS load_timestamp,
---     '1.0.0'                    AS data_product_version
+--     '2.0.0'                    AS data_product_version
 -- FROM l2_2_spec_unified.dspec_specification
 -- WHERE status_code = 'APP'
 --   AND is_current = TRUE

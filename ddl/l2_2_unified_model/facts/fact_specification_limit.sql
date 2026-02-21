@@ -4,11 +4,16 @@
 -- Layer  : L2.2 — Unified Data Model (Business Conform Layer)
 -- Domain : Pharmaceutical Quality — Specifications
 -- Grain  : One row per limit type per specification item per stage / time point
+-- Ref    : specification_data_model_30-jan.html → SPECIFICATION_LIMIT_SET + CONTROL_LIMITS
+-- Changes: v2 — added effective_end_date (ref ERD: SPECIFICATION_LIMIT_SET),
+--               merged CONTROL_LIMITS SPC fields: calculation_method,
+--               sample_size, last_calculated_date (populated for ALERT/ACTION rows).
 -- Purpose: Central fact table of the Specification star schema. Stores ALL limit
 --          values in a normalized, single-table structure — Acceptance Criteria
 --          (AC), Normal Operating Range (NOR), Proven Acceptable Range (PAR),
 --          Alert, Action, and IPC limits coexist in one table differentiated by
---          limit_type_key. This normalized design supports:
+--          limit_type_key. Merges SPECIFICATION_LIMIT_SET + CONTROL_LIMITS
+--          from ref ERD into one unified limits table. This normalized design supports:
 --            - Cross-limit-type comparison (AC vs NOR vs PAR)
 --            - Regulatory hierarchy validation (PAR >= AC >= NOR)
 --            - Incremental loading of individual limit types
@@ -143,13 +148,36 @@ CREATE TABLE IF NOT EXISTS l2_2_spec_unified.fact_specification_limit
     -- -------------------------------------------------------------------------
     -- SCD / Audit Tracking
     -- -------------------------------------------------------------------------
-    effective_date              DATE                        COMMENT 'Date this limit version became effective',
+    -- Limit Effective Date Range (aligned with SPECIFICATION_LIMIT_SET in ref ERD)
+    -- Limits can have their own effective window independent of the spec version.
+    -- -------------------------------------------------------------------------
+    effective_date              DATE                        COMMENT 'Date this limit version became effective (ref ERD: effective_start_date)',
+    effective_end_date          DATE                        COMMENT 'Date this limit version expires — NULL = open-ended (ref ERD: effective_end_date)',
+
+    -- -------------------------------------------------------------------------
+    -- Statistical Process Control (SPC) Attributes
+    -- From ref ERD: CONTROL_LIMITS entity — merged into this table for limit_type_code IN (ALERT, ACTION)
+    -- These columns are populated ONLY for ALERT and ACTION limit type rows.
+    -- NULL for AC, NOR, PAR, IPC_LIMIT, REPORT rows.
+    --
+    -- calculation_method values:
+    --   3_SIGMA      = Three standard deviation control limits (Shewhart)
+    --   CPK          = Process Capability Index-based limits
+    --   EWMA         = Exponentially Weighted Moving Average
+    --   CUSUM        = Cumulative Sum control chart
+    --   USP_PROC_PERF= USP Process Performance criteria
+    --   MANUAL       = Manually set limits (not statistically derived)
+    -- -------------------------------------------------------------------------
+    calculation_method          STRING                      COMMENT 'SPC calculation method (ALERT/ACTION only — ref ERD: CONTROL_LIMITS.calculation_method): 3_SIGMA|CPK|EWMA|CUSUM|MANUAL',
+    sample_size                 INT                         COMMENT 'Number of data points used to derive statistical control limits (ref ERD: CONTROL_LIMITS.sample_size)',
+    last_calculated_date        DATE                        COMMENT 'Date control limits were last recalculated from historical data (ref ERD: CONTROL_LIMITS.last_calculated_date)',
+
     load_timestamp              TIMESTAMP       NOT NULL    COMMENT 'ETL batch load timestamp (UTC)',
     is_current                  BOOLEAN         NOT NULL    COMMENT 'TRUE = current active limit; FALSE = superseded limit version'
 )
 USING DELTA
 PARTITIONED BY (stage_code)
-COMMENT 'L2.2 Specification limit fact table. Normalized: one row per limit type per specification item per stage/time point. All limit types (AC, NOR, PAR, Alert, Action, IPC) stored in one table differentiated by limit_type_key. is_in_filing=TRUE rows feed CTD regulatory filing tables.'
+COMMENT 'L2.2 Specification limit fact table v2. Normalized: one row per limit type per spec item per stage/time point. Merges SPECIFICATION_LIMIT_SET + CONTROL_LIMITS from ref ERD. v2 adds effective_end_date and SPC fields (calculation_method, sample_size, last_calculated_date) for ALERT/ACTION rows.'
 TBLPROPERTIES (
     'delta.autoOptimize.optimizeWrite'  = 'true',
     'delta.autoOptimize.autoCompact'    = 'true',
@@ -157,7 +185,9 @@ TBLPROPERTIES (
     'quality.domain'                    = 'specifications',
     'quality.layer'                     = 'L2.2',
     'quality.grain'                     = 'limit_type_per_spec_item_per_stage_timepoint',
-    'quality.ctd_filter'                = 'is_in_filing = TRUE AND is_current = TRUE AND stage_code IN (RELEASE, STABILITY)'
+    'quality.model_version'             = '2',
+    'quality.ctd_filter'                = 'is_in_filing = TRUE AND is_current = TRUE AND stage_code IN (RELEASE, STABILITY)',
+    'quality.source_model'              = 'SPECIFICATION_LIMIT_SET + CONTROL_LIMITS (specification_data_model_30-jan.html)'
 );
 
 -- OPTIMIZE l2_2_spec_unified.fact_specification_limit ZORDER BY (spec_item_key, limit_type_key);

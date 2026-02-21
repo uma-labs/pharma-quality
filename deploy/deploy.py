@@ -44,6 +44,22 @@ DATABRICKS_CATALOG   = _cfg.get("DATABRICKS_CATALOG", "pharma_quality")
 # Dependencies flow: reference dims → MDM dims → spec dims → fact → denorm → OBT
 # ---------------------------------------------------------------------------
 DDL_EXECUTION_ORDER = [
+    # ── L1 Schema bootstrap ────────────────────────────────────────────────
+    ("bootstrap", "CREATE_SCHEMA_L1",     None),   # inline, not a file
+
+    # ── L1 Raw landing tables (LIMS — append-only, source-faithful) ───────
+    ("l1",  "raw_lims_specification",     "ddl/l1_raw/raw_lims_specification.sql"),
+    ("l1",  "raw_lims_spec_item",         "ddl/l1_raw/raw_lims_spec_item.sql"),
+    ("l1",  "raw_lims_spec_limit",        "ddl/l1_raw/raw_lims_spec_limit.sql"),
+
+    # ── L2.1 Schema bootstrap ──────────────────────────────────────────────
+    ("bootstrap", "CREATE_SCHEMA_L2_1",   None),   # inline, not a file
+
+    # ── L2.1 Source conform tables (LIMS cleansed / typed) ────────────────
+    ("l2_1", "src_lims_specification",    "ddl/l2_1_source_conform/lims/src_lims_specification.sql"),
+    ("l2_1", "src_lims_spec_item",        "ddl/l2_1_source_conform/lims/src_lims_spec_item.sql"),
+    ("l2_1", "src_lims_spec_limit",       "ddl/l2_1_source_conform/lims/src_lims_spec_limit.sql"),
+
     # ── L2.2 Schema bootstrap ──────────────────────────────────────────────
     ("bootstrap", "CREATE_SCHEMA_L2_2",   None),   # inline, not a file
     ("bootstrap", "CREATE_SCHEMA_L3",     None),   # inline, not a file
@@ -58,6 +74,8 @@ DDL_EXECUTION_ORDER = [
     ("l2_2", "dim_product",               "ddl/l2_2_unified_model/dimensions/dim_product.sql"),
     ("l2_2", "dim_material",              "ddl/l2_2_unified_model/dimensions/dim_material.sql"),
     ("l2_2", "dim_test_method",           "ddl/l2_2_unified_model/dimensions/dim_test_method.sql"),
+    ("l2_2", "dim_site",                  "ddl/l2_2_unified_model/dimensions/dim_site.sql"),
+    ("l2_2", "dim_market",                "ddl/l2_2_unified_model/dimensions/dim_market.sql"),
 
     # ── L2.2 Core specification dimensions ────────────────────────────────
     ("l2_2", "dim_specification",         "ddl/l2_2_unified_model/dimensions/dim_specification.sql"),
@@ -76,13 +94,23 @@ DDL_EXECUTION_ORDER = [
 ]
 
 # Schema names per layer
+L1_SCHEMA   = "l1_raw"
+L2_1_SCHEMA = "l2_1_lims"
 L2_2_SCHEMA = "l2_2_spec_unified"
 L3_SCHEMA   = "l3_spec_products"
 
 # Inline bootstrap statements (run before any DDL files)
 BOOTSTRAP_STATEMENTS = {
-    "CREATE_SCHEMA_L2_2": [
+    "CREATE_SCHEMA_L1": [
         f"CREATE CATALOG IF NOT EXISTS {{catalog}}",
+        f"CREATE SCHEMA IF NOT EXISTS {{catalog}}.{L1_SCHEMA} "
+        f"COMMENT 'L1 Raw landing zone — immutable source-faithful ingestion'",
+    ],
+    "CREATE_SCHEMA_L2_1": [
+        f"CREATE SCHEMA IF NOT EXISTS {{catalog}}.{L2_1_SCHEMA} "
+        f"COMMENT 'L2.1 Source conform layer — LIMS cleansed, typed, and standardised'",
+    ],
+    "CREATE_SCHEMA_L2_2": [
         f"CREATE SCHEMA IF NOT EXISTS {{catalog}}.{L2_2_SCHEMA} "
         f"COMMENT 'L2.2 Pharma Quality Unified Data Model — Specifications domain'",
     ],
@@ -270,7 +298,7 @@ def parse_args():
     )
     parser.add_argument(
         "--layer",
-        choices=["l2_2", "l3", "all"],
+        choices=["l1", "l2_1", "l2_2", "l3", "all"],
         default="all",
         help="Deploy a specific layer (default: all)",
     )
@@ -304,7 +332,13 @@ def validate_config():
 
 
 def get_schema_for_layer(layer: str) -> str:
-    return L2_2_SCHEMA if layer in ("l2_2", "bootstrap") else L3_SCHEMA
+    if layer == "l1":
+        return L1_SCHEMA
+    if layer == "l2_1":
+        return L2_1_SCHEMA
+    if layer in ("l2_2", "bootstrap"):
+        return L2_2_SCHEMA
+    return L3_SCHEMA
 
 
 def main():

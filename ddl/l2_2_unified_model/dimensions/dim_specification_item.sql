@@ -4,6 +4,8 @@
 -- Layer  : L2.2 — Unified Data Model (Business Conform Layer)
 -- Domain : Pharmaceutical Quality — Specifications
 -- Grain  : One row per test / item per specification version
+-- Ref    : specification_data_model_30-jan.html → SPECIFICATION_ITEM
+-- Changes: v2 — added analyte_code (ref ERD field), criticality (CQA flag).
 -- Purpose: Individual test/item rows within a specification. Captures the test
 --          identity, category, method linkage, and reporting attributes.
 --          Limit values are stored separately in fact_specification_limit.
@@ -54,6 +56,23 @@ CREATE TABLE IF NOT EXISTS l2_2_spec_unified.dim_specification_item
     test_category_code          STRING                      COMMENT 'Category code: PHY|CHE|IMP|MIC|BIO|STER|PACK',
     test_category_name          STRING                      COMMENT 'Category display name',
     test_subcategory            STRING                      COMMENT 'Subcategory (e.g., Related Substances, Residual Solvents, Heavy Metals, Dissolution)',
+
+    -- -------------------------------------------------------------------------
+    -- Analyte & Criticality (from ref ERD: SPECIFICATION_ITEM)
+    -- analyte_code: identifies the specific substance/analyte being measured.
+    --   For multi-analyte tests (e.g., Related Substances), each impurity has
+    --   its own spec_item row with a distinct analyte_code.
+    --   Examples: ATV (Atorvastatin), IMP-A (Impurity A), TOTAL-IMP (Total)
+    --
+    -- criticality: Quality attribute classification per ICH Q8 / Q9 / Q10:
+    --   CQA    = Critical Quality Attribute (directly impacts safety/efficacy)
+    --   CCQA   = Critical Clinical Quality Attribute
+    --   NCQA   = Non-Critical Quality Attribute
+    --   KQA    = Key Quality Attribute (important but not critical)
+    --   REPORT = Report-only; no criticality designation
+    -- -------------------------------------------------------------------------
+    analyte_code                STRING                      COMMENT 'Specific analyte / substance code being measured (ref ERD: analyte_code)',
+    criticality                 STRING                      COMMENT 'Quality attribute criticality: CQA|CCQA|NCQA|KQA|REPORT (ref ERD: criticality)',
 
     -- -------------------------------------------------------------------------
     -- Ordering
