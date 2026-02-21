@@ -161,258 +161,439 @@ INSERT INTO l1_raw.raw_lims_spec_limit VALUES (
 
 -- =============================================================================
 -- SECTION 2: L2.2 DIMENSION SEED DATA
+-- Note: Identity (surrogate key) columns are excluded from INSERT column lists.
+--       Databricks GENERATED ALWAYS AS IDENTITY does not support DEFAULT keyword.
 -- =============================================================================
 
 USE SCHEMA l2_2_spec_unified;
 
--- Site
-INSERT INTO l2_2_spec_unified.dim_site VALUES (
-    DEFAULT, 'SITE-NJ01',
-    'NJ01', 'New Jersey Manufacturing Site', 'MANUFACTURING',
-    '1 Pharma Way', 'New Brunswick', 'New Jersey', 'US', 'United States',
-    'FDA', 'APPROVED', '2023-08-01', '2022-11-15', 'VAI',
-    'MDM', 'SITE-NJ01', current_timestamp(), TRUE
-);
+-- Sites (dim_site: site_key is identity — excluded from column list)
+INSERT INTO l2_2_spec_unified.dim_site
+    (site_id, site_code, site_name, site_type,
+     address_line, city, state_province, country_code, country_name,
+     regulatory_region, gmp_status, gmp_status_date,
+     last_inspection_date, last_inspection_outcome,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('SITE-NJ01', 'NJ01', 'New Jersey Manufacturing Site', 'MANUFACTURING',
+     '1 Pharma Way', 'New Brunswick', 'New Jersey', 'US', 'United States',
+     'FDA', 'APPROVED', '2023-08-01', '2022-11-15', 'VAI',
+     'MDM', 'SITE-NJ01', current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.dim_site VALUES (
-    DEFAULT, 'SITE-IN01',
-    'IN01', 'India API Manufacturing Site', 'MANUFACTURING',
-    '42 API Park', 'Hyderabad', 'Telangana', 'IN', 'India',
-    'FDA', 'APPROVED', '2024-03-01', '2023-09-10', 'NAI',
-    'MDM', 'SITE-IN01', current_timestamp(), TRUE
-);
+INSERT INTO l2_2_spec_unified.dim_site
+    (site_id, site_code, site_name, site_type,
+     address_line, city, state_province, country_code, country_name,
+     regulatory_region, gmp_status, gmp_status_date,
+     last_inspection_date, last_inspection_outcome,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('SITE-IN01', 'IN01', 'India API Manufacturing Site', 'MANUFACTURING',
+     '42 API Park', 'Hyderabad', 'Telangana', 'IN', 'India',
+     'FDA', 'APPROVED', '2024-03-01', '2023-09-10', 'NAI',
+     'MDM', 'SITE-IN01', current_timestamp(), TRUE);
 
--- Market
-INSERT INTO l2_2_spec_unified.dim_market VALUES (
-    DEFAULT, 'MKT-US-001',
-    'US', 'United States', 'US', 'United States',
-    'FDA', 'APPROVED', 'NDA-021366', '2003-12-17', NULL,
-    'USP', 'MDM', 'MKT-US-001', current_timestamp(), TRUE
-);
+-- Market (dim_market: market_key is identity)
+INSERT INTO l2_2_spec_unified.dim_market
+    (market_id, country_code, country_name, region_code, region_name,
+     regulatory_body, market_status, marketing_auth_number,
+     marketing_auth_date, marketing_auth_expiry_date, primary_pharmacopoeia,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('MKT-US-001', 'US', 'United States', 'US', 'United States',
+     'FDA', 'APPROVED', 'NDA-021366', '2003-12-17', NULL, 'USP',
+     'MDM', 'MKT-US-001', current_timestamp(), TRUE);
 
--- Product
-INSERT INTO l2_2_spec_unified.dim_product VALUES (
-    DEFAULT, 'PRD-ATV-001', 'ATV-010-TAB',
-    'Atorvastatin Calcium 10mg Tablets',
-    'Atorvastatin', 'Lipitor', 'TAB', 'Tablet',
-    'ORAL', '10 mg', 10.0000, 'mg',
-    'Cardiovascular', 'C10AA05', 'NDA-021366', 'APPROVED',
-    'MDM', current_timestamp(), TRUE
-);
+-- Product (dim_product: product_key is identity)
+INSERT INTO l2_2_spec_unified.dim_product
+    (product_id, product_code, product_name, inn_name, brand_name,
+     dosage_form_code, dosage_form_name, route_of_administration,
+     strength, strength_value, strength_uom,
+     therapeutic_area, atc_code, nda_number, product_status,
+     source_system_code, load_timestamp, is_current)
+VALUES
+    ('PRD-ATV-001', 'ATV-010-TAB', 'Atorvastatin Calcium 10mg Tablets',
+     'Atorvastatin', 'Lipitor', 'TAB', 'Tablet', 'ORAL',
+     '10 mg', 10.0000, 'mg',
+     'Cardiovascular', 'C10AA05', 'NDA-021366', 'APPROVED',
+     'MDM', current_timestamp(), TRUE);
 
--- Material (Drug Substance)
-INSERT INTO l2_2_spec_unified.dim_material VALUES (
-    DEFAULT, 'MAT-ATV-DS-001', 'ATV-DS-001',
-    'Atorvastatin Calcium', 'API', 'Active Pharmaceutical Ingredient',
-    '134523-00-5', 'C66H68CaF2N4O10', 1209.4200,
-    NULL, 'USP', 'Sun Pharma', 'SUNP-001',
-    'MDM', current_timestamp(), TRUE
-);
+-- Material (dim_material: material_key is identity)
+INSERT INTO l2_2_spec_unified.dim_material
+    (material_id, material_code, material_name,
+     material_type_code, material_type_name,
+     cas_number, molecular_formula, molecular_weight,
+     structural_formula, pharmacopoeia_grade,
+     manufacturer_name, manufacturer_code,
+     source_system_code, load_timestamp, is_current)
+VALUES
+    ('MAT-ATV-DS-001', 'ATV-DS-001', 'Atorvastatin Calcium',
+     'API', 'Active Pharmaceutical Ingredient',
+     '134523-00-5', 'C66H68CaF2N4O10', 1209.4200,
+     NULL, 'USP', 'Sun Pharma', 'SUNP-001',
+     'MDM', current_timestamp(), TRUE);
 
--- Test Methods
-INSERT INTO l2_2_spec_unified.dim_test_method VALUES (
-    DEFAULT, 'TM-HPLC-ATV-001', 'TM-HPLC-ATV-001',
-    'Assay of Atorvastatin by HPLC', '2.1', 'INHOUSE', 'In-House',
-    'HPLC', 'HPLC System (C18 Column)', 'USP <621>',
-    'VALIDATED', '2022-06-15', 'LIMS', 'TM-HPLC-ATV-001', current_timestamp(), TRUE
-);
+-- Test Methods (dim_test_method: test_method_key is identity)
+INSERT INTO l2_2_spec_unified.dim_test_method
+    (test_method_id, test_method_number, test_method_name, test_method_version,
+     method_type_code, method_type_name, analytical_technique, instrument_type,
+     compendia_reference, validation_status, validation_date,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('TM-HPLC-ATV-001', 'TM-HPLC-ATV-001', 'Assay of Atorvastatin by HPLC', '2.1',
+     'INHOUSE', 'In-House', 'HPLC', 'HPLC System (C18 Column)',
+     'USP <621>', 'VALIDATED', '2022-06-15',
+     'LIMS', 'TM-HPLC-ATV-001', current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.dim_test_method VALUES (
-    DEFAULT, 'TM-VIS-001', 'TM-VIS-001',
-    'Visual Inspection', '1.0', 'INHOUSE', 'In-House',
-    'VISUAL', 'Visual', NULL,
-    'WAIVED', NULL, 'LIMS', 'TM-VIS-001', current_timestamp(), TRUE
-);
+INSERT INTO l2_2_spec_unified.dim_test_method
+    (test_method_id, test_method_number, test_method_name, test_method_version,
+     method_type_code, method_type_name, analytical_technique, instrument_type,
+     compendia_reference, validation_status, validation_date,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('TM-VIS-001', 'TM-VIS-001', 'Visual Inspection', '1.0',
+     'INHOUSE', 'In-House', 'VISUAL', 'Visual',
+     NULL, 'WAIVED', NULL,
+     'LIMS', 'TM-VIS-001', current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.dim_test_method VALUES (
-    DEFAULT, 'TM-HPLC-IMP-001', 'TM-HPLC-IMP-001',
-    'Related Substances by HPLC', '1.5', 'INHOUSE', 'In-House',
-    'HPLC', 'HPLC System (C18 Column)', 'USP <621>',
-    'VALIDATED', '2022-09-01', 'LIMS', 'TM-HPLC-IMP-001', current_timestamp(), TRUE
-);
+INSERT INTO l2_2_spec_unified.dim_test_method
+    (test_method_id, test_method_number, test_method_name, test_method_version,
+     method_type_code, method_type_name, analytical_technique, instrument_type,
+     compendia_reference, validation_status, validation_date,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('TM-HPLC-IMP-001', 'TM-HPLC-IMP-001', 'Related Substances by HPLC', '1.5',
+     'INHOUSE', 'In-House', 'HPLC', 'HPLC System (C18 Column)',
+     'USP <621>', 'VALIDATED', '2022-09-01',
+     'LIMS', 'TM-HPLC-IMP-001', current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.dim_test_method VALUES (
-    DEFAULT, 'TM-DIS-001', 'TM-DIS-001',
-    'Dissolution Testing USP Apparatus II', '1.0', 'COMP', 'Compendial',
-    'DISSOLUTION', 'USP Apparatus II (Paddle)', 'USP <711>',
-    'VERIFIED', '2023-01-10', 'LIMS', 'TM-DIS-001', current_timestamp(), TRUE
-);
+INSERT INTO l2_2_spec_unified.dim_test_method
+    (test_method_id, test_method_number, test_method_name, test_method_version,
+     method_type_code, method_type_name, analytical_technique, instrument_type,
+     compendia_reference, validation_status, validation_date,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('TM-DIS-001', 'TM-DIS-001', 'Dissolution Testing USP Apparatus II', '1.0',
+     'COMP', 'Compendial', 'DISSOLUTION', 'USP Apparatus II (Paddle)',
+     'USP <711>', 'VERIFIED', '2023-01-10',
+     'LIMS', 'TM-DIS-001', current_timestamp(), TRUE);
 
--- Regulatory Context
--- (dim_regulatory_context is already seeded in dim_regulatory_context.sql)
+-- Regulatory Context already seeded by dim_regulatory_context.sql DDL (9 rows).
+-- US-NDA = regulatory_context_key 1 (first row in seed INSERT).
 
 -- =============================================================================
 -- SECTION 3: L2.2 STAR SCHEMA — SPECIFICATION + ITEMS + LIMITS
+-- Note: Identity (surrogate key) columns excluded from all INSERT column lists.
+--       spec_key 1 = DP spec, spec_key 2 = DS spec (identity generation order).
+--       spec_item_key 1-4 = Assay, Appearance, ImpA, Dissolution (DP).
 -- =============================================================================
 
--- Specification Header (Drug Product)
-INSERT INTO l2_2_spec_unified.dim_specification VALUES (
-    DEFAULT, 'LIMS-SP-DP-001',
-    'SP-DP-ATV-001', '1.0',
-    'Atorvastatin Calcium 10mg Tablets Specification',
-    'DP', 'Drug Product',
-    -- product_key, material_key — use subquery in real ETL; hardcode for demo
-    1, 1,  -- product_key, material_key
-    1,     -- site_key (NJ01)
-    1,     -- market_key (US)
-    7,     -- regulatory_context_key (US-NDA from seed data)
-    '3.2.P.5.1', 'COM', 'Commercial', 'APP', 'Approved',
-    '2024-01-15', NULL, '2024-01-10',
-    'J.Smith', 'QA Director', 'USP',
-    'SP-DP-ATV-000', 'LIMS', 'LIMS-SP-DP-001',
-    current_timestamp(), TRUE, current_timestamp(), NULL
-);
+-- dim_specification: Drug Product (DP)
+-- regulatory_context_key 1 = US-NDA (first row in dim_regulatory_context seed)
+INSERT INTO l2_2_spec_unified.dim_specification
+    (spec_id, spec_number, spec_version, spec_title,
+     spec_type_code, spec_type_name,
+     product_key, material_key, site_key, market_key, regulatory_context_key,
+     ctd_section, stage_code, stage_name, status_code, status_name,
+     effective_start_date, effective_end_date, approval_date,
+     approver_name, approver_title, compendia_reference, supersedes_spec_id,
+     source_system_code, source_system_id, load_timestamp, is_current, valid_from, valid_to)
+VALUES
+    ('LIMS-SP-DP-001', 'SP-DP-ATV-001', '1.0',
+     'Atorvastatin Calcium 10mg Tablets Specification',
+     'DP', 'Drug Product',
+     1, 1,    -- product_key (ATV 10mg Tabs), material_key (ATV DS)
+     1,       -- site_key (NJ01)
+     1,       -- market_key (US)
+     1,       -- regulatory_context_key (US-NDA)
+     '3.2.P.5.1', 'COM', 'Commercial', 'APP', 'Approved',
+     '2024-01-15', NULL, '2024-01-10',
+     'J.Smith', 'QA Director', 'USP',
+     'SP-DP-ATV-000', 'LIMS', 'LIMS-SP-DP-001',
+     current_timestamp(), TRUE, current_timestamp(), NULL);
 
--- Specification Header (Drug Substance)
-INSERT INTO l2_2_spec_unified.dim_specification VALUES (
-    DEFAULT, 'LIMS-SP-DS-001',
-    'SP-DS-ATV-001', '2.0',
-    'Atorvastatin Calcium Drug Substance Specification',
-    'DS', 'Drug Substance',
-    NULL, 1,   -- no product_key for DS; material_key = ATV DS
-    2,     -- site_key (IN01)
-    1,     -- market_key (US)
-    7,     -- regulatory_context_key (US-NDA)
-    '3.2.S.4.1', 'COM', 'Commercial', 'APP', 'Approved',
-    '2024-01-15', NULL, '2024-01-08',
-    'R.Patel', 'QA Head', 'USP',
-    'SP-DS-ATV-001V1', 'LIMS', 'LIMS-SP-DS-001',
-    current_timestamp(), TRUE, current_timestamp(), NULL
-);
+-- dim_specification: Drug Substance (DS)
+INSERT INTO l2_2_spec_unified.dim_specification
+    (spec_id, spec_number, spec_version, spec_title,
+     spec_type_code, spec_type_name,
+     product_key, material_key, site_key, market_key, regulatory_context_key,
+     ctd_section, stage_code, stage_name, status_code, status_name,
+     effective_start_date, effective_end_date, approval_date,
+     approver_name, approver_title, compendia_reference, supersedes_spec_id,
+     source_system_code, source_system_id, load_timestamp, is_current, valid_from, valid_to)
+VALUES
+    ('LIMS-SP-DS-001', 'SP-DS-ATV-001', '2.0',
+     'Atorvastatin Calcium Drug Substance Specification',
+     'DS', 'Drug Substance',
+     NULL, 1,  -- no product_key for DS; material_key = ATV DS
+     2,        -- site_key (IN01)
+     1,        -- market_key (US)
+     1,        -- regulatory_context_key (US-NDA)
+     '3.2.S.4.1', 'COM', 'Commercial', 'APP', 'Approved',
+     '2024-01-15', NULL, '2024-01-08',
+     'R.Patel', 'QA Head', 'USP',
+     'SP-DS-ATV-001V1', 'LIMS', 'LIMS-SP-DS-001',
+     current_timestamp(), TRUE, current_timestamp(), NULL);
 
--- Specification Items (DP — 4 tests)
--- IMPORTANT: spec_key values depend on identity column; use actual generated values in real ETL.
--- Here we use hardcoded values matching the INSERT order above (spec_key 1 = DP, 2 = DS).
+-- dim_specification_item: 4 tests for Drug Product (spec_key=1)
+-- test_method_key: 1=HPLC-ATV, 2=Visual, 3=HPLC-IMP, 4=Dissolution
+-- uom_key: 1=% (Percent), NULL=no unit
 
-INSERT INTO l2_2_spec_unified.dim_specification_item VALUES (
-    DEFAULT, 'ITEM-001', 1,          -- spec_item_key, spec_item_id, spec_key (DP)
-    1, 1,                            -- test_method_key (HPLC-ATV), uom_key (%)
-    'ASS-001', 'Assay', 'Assay of Atorvastatin Calcium',
-    'CHE', 'Chemical', 'Assay',
-    'ATV', 'CQA',                    -- analyte_code, criticality (NEW from ref ERD)
-    1,                               -- sequence_number
-    TRUE, 'NUMERIC', 1, NULL, TRUE, 'RELEASE',
-    'LIMS', 'ITEM-001', current_timestamp(), TRUE
-);
+INSERT INTO l2_2_spec_unified.dim_specification_item
+    (spec_item_id, spec_key, test_method_key, uom_key,
+     test_code, test_name, test_description,
+     test_category_code, test_category_name, test_subcategory,
+     analyte_code, criticality, sequence_number,
+     is_required, reporting_type, result_precision,
+     compendia_test_ref, is_compendial, stage_applicability,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('ITEM-001', 1, 1, 1,
+     'ASS-001', 'Assay', 'Assay of Atorvastatin Calcium',
+     'CHE', 'Chemical', 'Assay',
+     'ATV', 'CQA', 1,
+     TRUE, 'NUMERIC', 1,
+     NULL, TRUE, 'RELEASE',
+     'LIMS', 'ITEM-001', current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.dim_specification_item VALUES (
-    DEFAULT, 'ITEM-002', 1,
-    2, NULL,                         -- test_method_key (Visual), no uom
-    'APP-001', 'Appearance', 'Visual description of tablet',
-    'PHY', 'Physical', NULL,
-    NULL, 'NCQA',                    -- no analyte; criticality = Non-Critical
-    2,
-    TRUE, 'PASS_FAIL', NULL, NULL, TRUE, 'RELEASE',
-    'LIMS', 'ITEM-002', current_timestamp(), TRUE
-);
+INSERT INTO l2_2_spec_unified.dim_specification_item
+    (spec_item_id, spec_key, test_method_key, uom_key,
+     test_code, test_name, test_description,
+     test_category_code, test_category_name, test_subcategory,
+     analyte_code, criticality, sequence_number,
+     is_required, reporting_type, result_precision,
+     compendia_test_ref, is_compendial, stage_applicability,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('ITEM-002', 1, 2, NULL,
+     'APP-001', 'Appearance', 'Visual description of tablet',
+     'PHY', 'Physical', NULL,
+     NULL, 'NCQA', 2,
+     TRUE, 'PASS_FAIL', NULL,
+     NULL, TRUE, 'RELEASE',
+     'LIMS', 'ITEM-002', current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.dim_specification_item VALUES (
-    DEFAULT, 'ITEM-003', 1,
-    3, 1,                            -- test_method_key (HPLC-IMP), uom_key (%)
-    'IMP-001', 'Related Substances', 'Impurity A (individual)',
-    'IMP', 'Impurity', 'Related Substances',
-    'IMP-A', 'CQA',
-    3,
-    TRUE, 'NUMERIC', 2, NULL, TRUE, 'BOTH',
-    'LIMS', 'ITEM-003', current_timestamp(), TRUE
-);
+INSERT INTO l2_2_spec_unified.dim_specification_item
+    (spec_item_id, spec_key, test_method_key, uom_key,
+     test_code, test_name, test_description,
+     test_category_code, test_category_name, test_subcategory,
+     analyte_code, criticality, sequence_number,
+     is_required, reporting_type, result_precision,
+     compendia_test_ref, is_compendial, stage_applicability,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('ITEM-003', 1, 3, 1,
+     'IMP-001', 'Related Substances', 'Impurity A (individual)',
+     'IMP', 'Impurity', 'Related Substances',
+     'IMP-A', 'CQA', 3,
+     TRUE, 'NUMERIC', 2,
+     NULL, TRUE, 'BOTH',
+     'LIMS', 'ITEM-003', current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.dim_specification_item VALUES (
-    DEFAULT, 'ITEM-004', 1,
-    4, 1,                            -- test_method_key (Dissolution), uom_key (%)
-    'DIS-001', 'Dissolution', 'Dissolution in pH 6.8 phosphate buffer',
-    'PHY', 'Physical', 'Dissolution',
-    'ATV', 'CQA',
-    4,
-    TRUE, 'NUMERIC', 0, 'USP <711>', TRUE, 'RELEASE',
-    'LIMS', 'ITEM-004', current_timestamp(), TRUE
-);
+INSERT INTO l2_2_spec_unified.dim_specification_item
+    (spec_item_id, spec_key, test_method_key, uom_key,
+     test_code, test_name, test_description,
+     test_category_code, test_category_name, test_subcategory,
+     analyte_code, criticality, sequence_number,
+     is_required, reporting_type, result_precision,
+     compendia_test_ref, is_compendial, stage_applicability,
+     source_system_code, source_system_id, load_timestamp, is_current)
+VALUES
+    ('ITEM-004', 1, 4, 1,
+     'DIS-001', 'Dissolution', 'Dissolution in pH 6.8 phosphate buffer',
+     'PHY', 'Physical', 'Dissolution',
+     'ATV', 'CQA', 4,
+     TRUE, 'NUMERIC', 0,
+     'USP <711>', TRUE, 'RELEASE',
+     'LIMS', 'ITEM-004', current_timestamp(), TRUE);
 
--- Specification Limits (normalized fact — all limit types for Assay test)
--- spec_item_key=1 (Assay), limit_type_key: 1=AC, 2=PAR, 4=NOR, 5=ALERT
+-- fact_specification_limit: normalized limits for all 4 DP tests
+-- limit_type_key: 1=AC, 2=PAR, 4=NOR, 5=ALERT
+-- uom_key: 1=% (Percent)
+-- spec_item_key: 1=Assay, 2=Appearance, 3=ImpA, 4=Dissolution
 
-INSERT INTO l2_2_spec_unified.fact_specification_limit VALUES (
-    DEFAULT, 1, 1, 1, 1,    -- spec_limit_key, spec_key(DP), spec_item_key(Assay), limit_type_key(AC), uom_key(%)
-    95.0, 105.0, 100.0, 'NLT', 'NMT',
-    NULL, 'NLT 95.0% and NMT 105.0% (on as-labeled basis)',
-    'AS_LABELED', 'RELEASE', NULL, NULL,
-    FALSE, NULL, NULL, 'ICH Q6A', TRUE,
-    'LIMS', 'LIM-001',
-    '2024-01-15', NULL,                  -- effective_date, effective_end_date (NEW)
-    NULL, NULL, NULL,                    -- calculation_method, sample_size, last_calculated_date (NEW)
-    current_timestamp(), TRUE
-);
+-- Assay — Acceptance Criteria (is_in_filing=TRUE, regulatory_basis=ICH Q6A)
+INSERT INTO l2_2_spec_unified.fact_specification_limit
+    (spec_key, spec_item_key, limit_type_key, uom_key,
+     lower_limit_value, upper_limit_value, target_value,
+     lower_limit_operator, upper_limit_operator,
+     limit_text, limit_description, limit_basis, stage_code,
+     stability_time_point, stability_condition,
+     is_conditional, condition_description,
+     regulatory_basis, is_in_filing,
+     source_system_code, source_system_id,
+     effective_date, effective_end_date,
+     calculation_method, sample_size, last_calculated_date,
+     load_timestamp, is_current)
+VALUES
+    (1, 1, 1, 1,
+     95.0, 105.0, 100.0,
+     'NLT', 'NMT',
+     NULL, 'NLT 95.0% and NMT 105.0% (on as-labeled basis)', 'AS_LABELED', 'RELEASE',
+     NULL, NULL,
+     FALSE, NULL,
+     'ICH Q6A', TRUE,
+     'LIMS', 'LIM-001',
+     '2024-01-15', NULL,
+     NULL, NULL, NULL,
+     current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.fact_specification_limit VALUES (
-    DEFAULT, 1, 1, 4, 1,    -- limit_type_key 4 = NOR
-    98.0, 102.0, 100.0, 'NLT', 'NMT',
-    NULL, 'NLT 98.0% and NMT 102.0%',
-    'AS_LABELED', 'RELEASE', NULL, NULL,
-    FALSE, NULL, NULL, NULL, FALSE,
-    'LIMS', 'LIM-002',
-    '2024-01-15', NULL, NULL, NULL, NULL,
-    current_timestamp(), TRUE
-);
+-- Assay — Normal Operating Range (is_in_filing=FALSE — internal range)
+INSERT INTO l2_2_spec_unified.fact_specification_limit
+    (spec_key, spec_item_key, limit_type_key, uom_key,
+     lower_limit_value, upper_limit_value, target_value,
+     lower_limit_operator, upper_limit_operator,
+     limit_text, limit_description, limit_basis, stage_code,
+     stability_time_point, stability_condition,
+     is_conditional, condition_description,
+     regulatory_basis, is_in_filing,
+     source_system_code, source_system_id,
+     effective_date, effective_end_date,
+     calculation_method, sample_size, last_calculated_date,
+     load_timestamp, is_current)
+VALUES
+    (1, 1, 4, 1,
+     98.0, 102.0, 100.0,
+     'NLT', 'NMT',
+     NULL, 'NLT 98.0% and NMT 102.0%', 'AS_LABELED', 'RELEASE',
+     NULL, NULL,
+     FALSE, NULL,
+     NULL, FALSE,
+     'LIMS', 'LIM-002',
+     '2024-01-15', NULL,
+     NULL, NULL, NULL,
+     current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.fact_specification_limit VALUES (
-    DEFAULT, 1, 1, 2, 1,    -- limit_type_key 2 = PAR
-    92.0, 108.0, 100.0, 'NLT', 'NMT',
-    NULL, 'NLT 92.0% and NMT 108.0%',
-    'AS_LABELED', 'RELEASE', NULL, NULL,
-    FALSE, NULL, NULL, 'ICH Q8', TRUE,
-    'LIMS', 'LIM-003',
-    '2024-01-15', NULL, NULL, NULL, NULL,
-    current_timestamp(), TRUE
-);
+-- Assay — Proven Acceptable Range (is_in_filing=TRUE, regulatory_basis=ICH Q8)
+INSERT INTO l2_2_spec_unified.fact_specification_limit
+    (spec_key, spec_item_key, limit_type_key, uom_key,
+     lower_limit_value, upper_limit_value, target_value,
+     lower_limit_operator, upper_limit_operator,
+     limit_text, limit_description, limit_basis, stage_code,
+     stability_time_point, stability_condition,
+     is_conditional, condition_description,
+     regulatory_basis, is_in_filing,
+     source_system_code, source_system_id,
+     effective_date, effective_end_date,
+     calculation_method, sample_size, last_calculated_date,
+     load_timestamp, is_current)
+VALUES
+    (1, 1, 2, 1,
+     92.0, 108.0, 100.0,
+     'NLT', 'NMT',
+     NULL, 'NLT 92.0% and NMT 108.0%', 'AS_LABELED', 'RELEASE',
+     NULL, NULL,
+     FALSE, NULL,
+     'ICH Q8', TRUE,
+     'LIMS', 'LIM-003',
+     '2024-01-15', NULL,
+     NULL, NULL, NULL,
+     current_timestamp(), TRUE);
 
-INSERT INTO l2_2_spec_unified.fact_specification_limit VALUES (
-    DEFAULT, 1, 1, 5, 1,    -- limit_type_key 5 = ALERT
-    98.5, 101.5, 100.0, 'NLT', 'NMT',
-    NULL, 'Alert: NLT 98.5% and NMT 101.5% (3-sigma, n=120)',
-    'AS_LABELED', 'RELEASE', NULL, NULL,
-    FALSE, NULL, NULL, NULL, FALSE,
-    'LIMS', 'LIM-004',
-    '2024-01-15', NULL,
-    '3_SIGMA', 120, '2024-01-01',        -- SPC fields (NEW from CONTROL_LIMITS)
-    current_timestamp(), TRUE
-);
+-- Assay — Alert Limit (SPC-derived: 3-sigma, n=120; is_in_filing=FALSE)
+INSERT INTO l2_2_spec_unified.fact_specification_limit
+    (spec_key, spec_item_key, limit_type_key, uom_key,
+     lower_limit_value, upper_limit_value, target_value,
+     lower_limit_operator, upper_limit_operator,
+     limit_text, limit_description, limit_basis, stage_code,
+     stability_time_point, stability_condition,
+     is_conditional, condition_description,
+     regulatory_basis, is_in_filing,
+     source_system_code, source_system_id,
+     effective_date, effective_end_date,
+     calculation_method, sample_size, last_calculated_date,
+     load_timestamp, is_current)
+VALUES
+    (1, 1, 5, 1,
+     98.5, 101.5, 100.0,
+     'NLT', 'NMT',
+     NULL, 'Alert: NLT 98.5% and NMT 101.5% (3-sigma, n=120)', 'AS_LABELED', 'RELEASE',
+     NULL, NULL,
+     FALSE, NULL,
+     NULL, FALSE,
+     'LIMS', 'LIM-004',
+     '2024-01-15', NULL,
+     '3_SIGMA', 120, '2024-01-01',
+     current_timestamp(), TRUE);
 
--- Appearance — Pass/Fail AC
-INSERT INTO l2_2_spec_unified.fact_specification_limit VALUES (
-    DEFAULT, 1, 2, 1, NULL,  -- spec_item_key=2 (Appearance), limit_type=AC, no uom
-    NULL, NULL, NULL, 'NONE', 'NONE',
-    'White to off-white, round, biconvex, film-coated tablets',
-    'White to off-white, round, biconvex, film-coated tablets',
-    NULL, 'RELEASE', NULL, NULL,
-    FALSE, NULL, NULL, NULL, TRUE,
-    'LIMS', 'LIM-005',
-    '2024-01-15', NULL, NULL, NULL, NULL,
-    current_timestamp(), TRUE
-);
+-- Appearance — Acceptance Criteria (Pass/Fail; no uom; is_in_filing=TRUE)
+INSERT INTO l2_2_spec_unified.fact_specification_limit
+    (spec_key, spec_item_key, limit_type_key, uom_key,
+     lower_limit_value, upper_limit_value, target_value,
+     lower_limit_operator, upper_limit_operator,
+     limit_text, limit_description, limit_basis, stage_code,
+     stability_time_point, stability_condition,
+     is_conditional, condition_description,
+     regulatory_basis, is_in_filing,
+     source_system_code, source_system_id,
+     effective_date, effective_end_date,
+     calculation_method, sample_size, last_calculated_date,
+     load_timestamp, is_current)
+VALUES
+    (1, 2, 1, NULL,
+     NULL, NULL, NULL,
+     'NONE', 'NONE',
+     'White to off-white, round, biconvex, film-coated tablets',
+     'White to off-white, round, biconvex, film-coated tablets',
+     NULL, 'RELEASE',
+     NULL, NULL,
+     FALSE, NULL,
+     NULL, TRUE,
+     'LIMS', 'LIM-005',
+     '2024-01-15', NULL,
+     NULL, NULL, NULL,
+     current_timestamp(), TRUE);
 
--- Impurity A — AC
-INSERT INTO l2_2_spec_unified.fact_specification_limit VALUES (
-    DEFAULT, 1, 3, 1, 1,    -- spec_item_key=3 (ImpA), limit_type=AC, uom=%
-    NULL, 0.10, NULL, 'NONE', 'NMT',
-    NULL, 'NMT 0.10%',
-    NULL, 'RELEASE', NULL, NULL,
-    FALSE, NULL, NULL, 'ICH Q3B', TRUE,
-    'LIMS', 'LIM-006',
-    '2024-01-15', NULL, NULL, NULL, NULL,
-    current_timestamp(), TRUE
-);
+-- Impurity A — Acceptance Criteria (NMT 0.10%; is_in_filing=TRUE)
+INSERT INTO l2_2_spec_unified.fact_specification_limit
+    (spec_key, spec_item_key, limit_type_key, uom_key,
+     lower_limit_value, upper_limit_value, target_value,
+     lower_limit_operator, upper_limit_operator,
+     limit_text, limit_description, limit_basis, stage_code,
+     stability_time_point, stability_condition,
+     is_conditional, condition_description,
+     regulatory_basis, is_in_filing,
+     source_system_code, source_system_id,
+     effective_date, effective_end_date,
+     calculation_method, sample_size, last_calculated_date,
+     load_timestamp, is_current)
+VALUES
+    (1, 3, 1, 1,
+     NULL, 0.10, NULL,
+     'NONE', 'NMT',
+     NULL, 'NMT 0.10%', NULL, 'RELEASE',
+     NULL, NULL,
+     FALSE, NULL,
+     'ICH Q3B', TRUE,
+     'LIMS', 'LIM-006',
+     '2024-01-15', NULL,
+     NULL, NULL, NULL,
+     current_timestamp(), TRUE);
 
--- Dissolution — AC (Q=75% in 30 min)
-INSERT INTO l2_2_spec_unified.fact_specification_limit VALUES (
-    DEFAULT, 1, 4, 1, 1,    -- spec_item_key=4 (Dissolution), limit_type=AC, uom=%
-    75.0, NULL, NULL, 'NLT', 'NONE',
-    NULL, 'Q = NLT 75% in 30 minutes (USP Apparatus II)',
-    NULL, 'RELEASE', NULL, NULL,
-    FALSE, NULL, NULL, 'USP <711>', TRUE,
-    'LIMS', 'LIM-007',
-    '2024-01-15', NULL, NULL, NULL, NULL,
-    current_timestamp(), TRUE
-);
+-- Dissolution — Acceptance Criteria (Q=NLT 75% in 30 min; is_in_filing=TRUE)
+INSERT INTO l2_2_spec_unified.fact_specification_limit
+    (spec_key, spec_item_key, limit_type_key, uom_key,
+     lower_limit_value, upper_limit_value, target_value,
+     lower_limit_operator, upper_limit_operator,
+     limit_text, limit_description, limit_basis, stage_code,
+     stability_time_point, stability_condition,
+     is_conditional, condition_description,
+     regulatory_basis, is_in_filing,
+     source_system_code, source_system_id,
+     effective_date, effective_end_date,
+     calculation_method, sample_size, last_calculated_date,
+     load_timestamp, is_current)
+VALUES
+    (1, 4, 1, 1,
+     75.0, NULL, NULL,
+     'NLT', 'NONE',
+     NULL, 'Q = NLT 75% in 30 minutes (USP Apparatus II)', NULL, 'RELEASE',
+     NULL, NULL,
+     FALSE, NULL,
+     'USP <711>', TRUE,
+     'LIMS', 'LIM-007',
+     '2024-01-15', NULL,
+     NULL, NULL, NULL,
+     current_timestamp(), TRUE);
 
 -- =============================================================================
 -- SECTION 4: VALIDATION QUERIES — verify end-to-end
