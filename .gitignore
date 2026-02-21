@@ -21,3 +21,6 @@ env/
 Thumbs.db
 
 .databricks
+
+# Claude Code local settings (may contain tokens/PATs)
+.claude/
